@@ -83,6 +83,8 @@ Click [here](install.md) for detailed installation instructions.
 
 Click [here](install.md) for detailed instructions.
 
+For local LAN HTTPS development, see the helper-script workflow in [install.md](install.md#31-local-https-helper-scripts-for-lan-development).
+
 ## 3. Frequently Asked Questions
 
 ### A. How to make your local EUDIW Issuer available on the Internet?

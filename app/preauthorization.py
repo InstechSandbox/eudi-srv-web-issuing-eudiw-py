@@ -117,13 +117,14 @@ def preauthRed():
     current_session = session_manager.get_session(session_id=session_id)
 
     target_url = ConfFrontend.registered_frontends[current_session.frontend_id]["url"]
+    service_base_url = cfgservice.service_url.rstrip("/")
 
     return post_redirect_with_payload(
         target_url=f"{target_url}/display_form",
         data_payload={
             "mandatory_attributes": mandatory_attributes,
             "optional_attributes": optional_attributes_filtered,
-            "redirect_url": f"{cfgservice.service_url}preauth_form",
+            "redirect_url": f"{service_base_url}/preauth_form",
             "session_id": session_id,
         },
     )
@@ -164,12 +165,13 @@ def preauth_form():
     presentation_data = presentation_formatter(cleaned_data=cleaned_data)
 
     target_url = ConfFrontend.registered_frontends[current_session.frontend_id]["url"]
+    service_base_url = cfgservice.service_url.rstrip("/")
 
     return post_redirect_with_payload(
         target_url=f"{target_url}/display_authorization",
         data_payload={
             "presentation_data": presentation_data,
-            "redirect_url": f"{cfgservice.service_url}form_authorize_generate",
+            "redirect_url": f"{service_base_url}/form_authorize_generate",
             "session_id": session_id,
         },
     )

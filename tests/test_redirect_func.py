@@ -15,7 +15,8 @@
 # limitations under the License.
 #
 ###############################################################################
-
+from html import unescape
+import re
 import pytest
 from unittest.mock import patch, MagicMock
 from flask import Flask, json
@@ -110,3 +111,18 @@ class TestRedirectFunc:
         args, kwargs = mock_render.call_args
         decoded_payload = json.loads(kwargs["data"])
         assert decoded_payload["key"] == ""
+
+    def test_post_redirect_with_payload_escapes_html_attribute(self, app):
+        target_url = "https://wallet.com/callback"
+        payload = {"holder": "O'Reilly"}
+
+        with app.app_context():
+            rendered_html = rf.post_redirect_with_payload(target_url, payload)
+
+        assert 'value="{&#34;holder&#34;: &#34;O&#39;Reilly&#34;}"' in rendered_html
+
+        payload_match = re.search(r'name="payload" value="([^"]+)"', rendered_html)
+        assert payload_match is not None
+
+        decoded_payload = json.loads(unescape(payload_match.group(1)))
+        assert decoded_payload == payload

@@ -287,13 +287,14 @@ def getpidoid4vp():
         target_url = ConfFrontend.registered_frontends[current_session.frontend_id][
             "url"
         ]
+        service_base_url = cfgservice.service_url.rstrip("/")
 
         return post_redirect_with_payload(
             target_url=f"{target_url}/display_form",
             data_payload={
                 "mandatory_attributes": attributesForm,
                 "optional_attributes": attributesForm2,
-                "redirect_url": f"{cfgservice.service_url}dynamic/form",
+                "redirect_url": f"{service_base_url}/dynamic/form",
                 "session_id": session_id,
             },
         )

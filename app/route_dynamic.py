@@ -201,13 +201,14 @@ def dynamic_R1(country):
         target_url = ConfFrontend.registered_frontends[current_session.frontend_id][
             "url"
         ]
+        service_base_url = cfgserv.service_url.rstrip("/")
 
         return post_redirect_with_payload(
             target_url=f"{target_url}/display_form",
             data_payload={
                 "mandatory_attributes": mandatory_attributes,
                 "optional_attributes": optional_attributes_filtered,
-                "redirect_url": f"{cfgserv.service_url}dynamic/form",
+                "redirect_url": f"{service_base_url}/dynamic/form",
                 "session_id": session_id,
             },
         )
@@ -448,16 +449,10 @@ def red():
 
     user_id = current_session.country + "." + session["access_token"]
 
-    target_url = ConfFrontend.registered_frontends[current_session.frontend_id]["url"]
-
-    return post_redirect_with_payload(
-        target_url=f"{target_url}/display_authorization",
-        data_payload={
-            "presentation_data": presentation_data,
-            "redirect_url": f"{cfgserv.service_url}dynamic/redirect_wallet",
-            "session_id": session_id,
-        },
-    )
+    # Construct wallet deep link URI
+    wallet_deep_link = f"eu.europa.ec.euidi://authorization?code={auth_code}"
+    cfgserv.app_logger.info(f"Redirecting to wallet deep link: {wallet_deep_link} [302]")
+    return redirect(wallet_deep_link)
 
 
 @dynamic.route("/dynamic_R2", methods=["GET", "POST"])
@@ -1232,12 +1227,13 @@ def Dynamic_form():
     presentation_data = presentation_formatter(cleaned_data=cleaned_data)
 
     target_url = ConfFrontend.registered_frontends[current_session.frontend_id]["url"]
+    service_base_url = cfgserv.service_url.rstrip("/")
 
     return post_redirect_with_payload(
         target_url=f"{target_url}/display_authorization",
         data_payload={
             "presentation_data": presentation_data,
-            "redirect_url": f"{cfgserv.service_url}dynamic/redirect_wallet",
+            "redirect_url": f"{service_base_url}/dynamic/redirect_wallet",
             "session_id": session_id,
         },
     )

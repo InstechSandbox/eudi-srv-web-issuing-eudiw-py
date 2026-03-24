@@ -30,10 +30,14 @@ import os
 import sys
 
 
+def _env_flag(name, default="false"):
+    return os.getenv(name, default).strip().lower() not in {"0", "false", "no"}
+
+
 class ConfService:
     # ------------------------------------------------------------------------------------------------
     # PID issuer service URL
-    service_url = os.getenv("SERVICE_URL", "https://backend.issuer.eudiw.dev/")
+    service_url = os.getenv("SERVICE_URL", "https://backend.issuer.eudiw.dev/").rstrip("/") + "/"
     # service_url = "https://127.0.0.1:5000/"
 
     wallet_test_url = os.getenv("WALLET_TEST_URL", "https://tester.issuer.eudiw.dev/")
@@ -79,11 +83,23 @@ class ConfService:
     # OpenID endpoints
 
     OpenID_first_endpoint = os.getenv(
-        "VERIFY_USER_ENDPOINT", service_url + "oidc/verify/user"
+        "VERIFY_USER_ENDPOINT", service_url.rstrip("/") + "/verify/user"
     )
 
     authorization_server_internal_url = os.getenv(
         "AUTH_SERVER_INTERNAL_URL", "http://127.0.0.1:6005"
+    )
+
+    auth_server_verify_tls = _env_flag("AUTH_SERVER_VERIFY_TLS", "true")
+
+    service_verify_tls = _env_flag("SERVICE_VERIFY_TLS", "true")
+
+    allow_missing_revocation_data = _env_flag(
+        "ALLOW_MISSING_REVOCATION_DATA", "false"
+    )
+
+    allow_local_utopia_signer_fallback = _env_flag(
+        "ALLOW_LOCAL_UTOPIA_SIGNER_FALLBACK", "false"
     )
 
     dynamic_presentation_url = os.getenv(

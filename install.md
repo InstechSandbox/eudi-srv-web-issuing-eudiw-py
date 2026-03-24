@@ -99,6 +99,61 @@ To run the EUDIW Issuer, please follow these simple steps (some of which may hav
     ```
     flask --app app run --debug
     ```
+
+### 3.1 Local HTTPS helper scripts for LAN development
+
+If you are running the local authorization server on port `5001`, this issuer backend on port `5002`, and the local frontend on port `5003`, the repository includes helper scripts to patch `.env` and start the backend over HTTPS.
+
+1. Ensure `app/.env` exists:
+
+    ```shell
+    cp app/.env.example app/.env
+    ```
+
+2. If you do not already have a local certificate for the backend, generate one using the repository SAN config:
+
+    ```shell
+    openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+      -keyout server.key \
+      -out server.crt \
+      -config ip-san.conf
+    ```
+
+    The provided `ip-san.conf` includes the LAN IP, `127.0.0.1`, and `localhost` in the certificate Subject Alternative Name for local HTTPS development.
+
+3. Patch `app/.env` and related local metadata for your LAN host and local ports:
+
+    ```shell
+    MYIP=192.168.0.110 AUTH_PORT=5001 ISSUER_PORT=5002 FRONTEND_PORT=5003 ./patch_issuer_backend_local.sh
+    ```
+
+    What this script does:
+
+    + rewrites `app/.env` with local service URLs and the local frontend URL
+    + sets `VERIFY_USER_ENDPOINT` to the local authorization server
+    + points revocation URLs at the local backend
+    + updates local metadata files to use the current backend base URL
+    + adjusts the backend route that resolves the frontend OAuth metadata endpoint
+
+    Notes:
+
+    + this script modifies tracked files in place; review the resulting diff before committing
+    + it is intended for local development, not production deployment
+    + it does not create `server.crt` or `server.key`; generate those separately if needed
+
+4. Start the backend with HTTPS:
+
+    ```shell
+    ./run_backend.sh
+    ```
+
+    This script assumes the local Python virtual environment already exists at `.venv` and that the backend dependencies from steps 2 to 5 have already been installed into it.
+
+    Optional overrides:
+
+    + `ISSUER_PORT` defaults to `5002`
+    + `ISSUER_CERT_FILE` defaults to `server.crt`
+    + `ISSUER_KEY_FILE` defaults to `server.key`
     
 ## 4. Running your local EUDIW Issuer over HTTPS
 

@@ -70,6 +70,73 @@ ee_redirect_uri = os.getenv(
 )
 
 
+def _resolve_first_existing(candidates):
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return candidates[0]
+
+
+def _resolve_utopia_privkey_and_password():
+    candidates = [
+        (cfgserv.privKey_path + "PID-DS-0001_UT.pem", None),
+        (cfgserv.privKey_path + "PID-DS-0002-decrypted.key.pem", None),
+        (cfgserv.privKey_path + "PID-DS-0002.pid-ds-0002.key.pem", b"pid-ds-0002"),
+    ]
+
+    primary_candidate = candidates[0]
+    if os.path.exists(primary_candidate[0]):
+        return primary_candidate
+
+    if not cfgserv.allow_local_utopia_signer_fallback:
+        return primary_candidate
+
+    for path, password in candidates:
+        if os.path.exists(path):
+            return path, password
+
+    return primary_candidate
+
+
+UTOPIA_PID_MDOC_PRIVKEY, UTOPIA_PID_MDOC_PRIVKEY_PASSWORD = (
+    _resolve_utopia_privkey_and_password()
+)
+UTOPIA_PID_MDOC_CERT = _resolve_first_existing(
+    [cfgserv.trusted_CAs_path + "PID-DS-0001_UT_cert.der"]
+    if not cfgserv.allow_local_utopia_signer_fallback
+    else [
+        cfgserv.trusted_CAs_path + "PID-DS-0001_UT_cert.der",
+        cfgserv.trusted_CAs_path + "PID-DS-0002.cert.der",
+    ]
+)
+
+
+def _resolve_age_verification_signer():
+    default_privkey = cfgserv.privKey_path + "AgeVerificationDS-001.pem"
+    fallback_privkeys = [
+        default_privkey,
+        cfgserv.privKey_path + "PID-DS-0002-decrypted.key.pem",
+    ]
+    default_cert = cfgserv.trusted_CAs_path + "AgeVerificationDS-001_cert.der"
+    fallback_certs = [
+        default_cert,
+        cfgserv.trusted_CAs_path + "PID-DS-0002.cert.der",
+    ]
+
+    if not cfgserv.allow_local_utopia_signer_fallback:
+        return default_privkey, default_cert
+
+    return (
+        _resolve_first_existing(fallback_privkeys),
+        _resolve_first_existing(fallback_certs),
+    )
+
+
+AGE_VERIFICATION_MDOC_PRIVKEY, AGE_VERIFICATION_MDOC_CERT = (
+    _resolve_age_verification_signer()
+)
+
+
 class ConfCountries:
     urlReturnEE = "https://pprpid.provider.eudiw.projj.eu/tara/redirect"
 
@@ -108,11 +175,11 @@ class ConfCountries:
         formCountry: {
             "name": "FormEU",
             "pid_url": cfgserv.service_url + "pid/form",
-            "pid_mdoc_privkey": cfgserv.privKey_path + "PID-DS-0001_UT.pem",
+            "pid_mdoc_privkey": UTOPIA_PID_MDOC_PRIVKEY,
             # "pid_mdoc_privkey": cfgserv.privKey_path + "hackathon-DS-0001_UT.pem",
             # "pid_mdoc_privkey": 'app\certs\PID-DS-0001_UT.pem',
-            "pid_mdoc_privkey_passwd": None,  # None or bytes
-            "pid_mdoc_cert": cfgserv.trusted_CAs_path + "PID-DS-0001_UT_cert.der",
+            "pid_mdoc_privkey_passwd": UTOPIA_PID_MDOC_PRIVKEY_PASSWORD,  # None or bytes
+            "pid_mdoc_cert": UTOPIA_PID_MDOC_CERT,
             # "pid_mdoc_cert": cfgserv.trusted_CAs_path + "hackathon-DS-0001_UT_cert.der",
             "un_distinguishing_sign": "FC",
             "supported_credentials": [
@@ -294,9 +361,9 @@ class ConfCountries:
         },
         "AV": {
             "name": "Trusted Issuer",
-            "pid_mdoc_privkey": "/etc/eudiw/age_verification/privKey/AgeVerificationDS-001.pem",
+            "pid_mdoc_privkey": AGE_VERIFICATION_MDOC_PRIVKEY,
             "pid_mdoc_privkey_passwd": None,  # None or bytes
-            "pid_mdoc_cert": "/etc/eudiw/age_verification/cert/AgeVerificationDS-001_cert.der",
+            "pid_mdoc_cert": AGE_VERIFICATION_MDOC_CERT,
             "un_distinguishing_sign": "AV",
             "supported_credentials": [
                 "eu.europa.ec.eudi.age_verification_mdoc",
@@ -306,9 +373,9 @@ class ConfCountries:
         },
         "AV2": {
             "name": "Non-Trusted Issuer",
-            "pid_mdoc_privkey": "/etc/eudiw/age_verification/privKey/bak/AgeVerificationDS-001.pem",
+            "pid_mdoc_privkey": AGE_VERIFICATION_MDOC_PRIVKEY,
             "pid_mdoc_privkey_passwd": None,  # None or bytes
-            "pid_mdoc_cert": "/etc/eudiw/age_verification/cert/bak/AgeVerificationDS-001_cert.der",
+            "pid_mdoc_cert": AGE_VERIFICATION_MDOC_CERT,
             "un_distinguishing_sign": "AV",
             "supported_credentials": [
                 "eu.europa.ec.eudi.age_verification_mdoc",
@@ -322,7 +389,7 @@ class ConfCountries:
 class ConfFrontend:
     registered_frontends = {
         cfgserv.default_frontend: {
-            "url": os.getenv("DEFAULT_FRONTEND_URL", "https://ec.dev.issuer.eudiw.dev")
+            "url": os.getenv("DEFAULT_FRONTEND_URL", "http://192.168.0.110:5003")
         },
         "6d725b3c-6d42-448e-8bfd-1eff1fcf152d": {
             "url": "https://age-verification.issuer.eudiw.dev"

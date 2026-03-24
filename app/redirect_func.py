@@ -89,7 +89,7 @@ def post_redirect_with_payload(target_url: str, data_payload: dict):
     </head>
     <body>
         <form id="redirect_form" method="POST" action="{{ url }}">
-            <input type="hidden" name="payload" value='{{ data | safe }}'>
+            <input type="hidden" name="payload" value="{{ data }}">
             <noscript>
                 <div style="font-family: sans-serif; padding: 20px; text-align: center;">
                     <p>JavaScript is required. Please click the button below:</p>

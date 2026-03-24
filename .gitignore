@@ -216,3 +216,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
+
+# Local runtime artifacts
+.DS_Store
+local/
+app/private/cookie_jwks.json
+app/private/jwks.json
+app/private/token_jwks.json
+app/static/jwks.json

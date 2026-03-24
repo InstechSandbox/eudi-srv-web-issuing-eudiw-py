@@ -51,6 +51,52 @@ from app_config.config_service import ConfService as cfgservice
 from app import session_manager
 
 
+def _handle_revocation_failure(message):
+    if cfgservice.allow_missing_revocation_data:
+        cfgservice.app_logger.warning(message + " Continuing without revocation data.")
+        return None
+
+    raise RuntimeError(message)
+
+
+def _fetch_revocation_data(document_id, country, expiry_date):
+    if not cfgservice.revocation_api_key:
+        return None
+
+    payload = (
+        "doctype=" + document_id + "&country=" + country + "&expiry_date=" + expiry_date
+    )
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Api-Key": cfgservice.revocation_api_key,
+    }
+
+    try:
+        response = requests.post(
+            cfgservice.revocation_service_url,
+            headers=headers,
+            data=payload,
+            verify=cfgservice.service_verify_tls,
+            timeout=30,
+        )
+    except requests.exceptions.RequestException as exc:
+        return _handle_revocation_failure(
+            f"Revocation service request failed: {str(exc)}"
+        )
+
+    if response.status_code != 200:
+        return _handle_revocation_failure(
+            f"Revocation service returned status {response.status_code}."
+        )
+
+    try:
+        return response.json()
+    except ValueError:
+        return _handle_revocation_failure(
+            "Revocation service returned non-JSON response."
+        )
+
+
 def mdocFormatter(
     data: dict,
     credential_metadata: dict,
@@ -133,30 +179,15 @@ def mdocFormatter(
     # Construct and sign the mdoc
     mdoci = MdocCborIssuer(private_key=cose_pkey, alg="ES256")
 
-    revocation_json = None
-
     country = current_session.country
 
-    if cfgservice.revocation_api_key and country not in ("AV", "AV2"):
-        payload = (
-            "doctype="
-            + credential_metadata["doctype"]
-            + "&country="
-            + country
-            + "&expiry_date="
-            + validity["expiry_date"].strftime("%Y-%m-%d")
+    revocation_json = None
+    if country not in ("AV", "AV2"):
+        revocation_json = _fetch_revocation_data(
+            credential_metadata["doctype"],
+            country,
+            validity["expiry_date"].strftime("%Y-%m-%d"),
         )
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-Api-Key": cfgservice.revocation_api_key,
-        }
-
-        response = requests.post(
-            cfgservice.revocation_service_url, headers=headers, data=payload
-        )
-
-        if response.status_code == 200:
-            revocation_json = response.json()
 
     mdoci.new(
         doctype=credential_metadata["doctype"],
@@ -302,26 +333,10 @@ def sdjwtFormatter(PID, country):
 
     #doctype = vct2doctype(vct)
 
-    revocation_json = None
-
-    if cfgservice.revocation_api_key:
-        payload = (
-            "doctype=" + vct + "&country=" + country + "&expiry_date=" + validity
-        )
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-Api-Key": cfgservice.revocation_api_key,
-        }
-
-        response = requests.post(
-            cfgservice.revocation_service_url, headers=headers, data=payload
-        )
-
-        if response.status_code == 200:
-            revocation_json = response.json()
+    revocation_json = _fetch_revocation_data(vct, country, validity)
 
     claims = {
-        "iss": cfgservice.service_url[:-1],
+        "iss": cfgservice.service_url.rstrip("/"),
         "iat": iat,
         "exp": exp,
         "vct": vct,

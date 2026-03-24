@@ -170,7 +170,7 @@ def setup_metadata():
 
     old_domain = oidc_metadata["credential_issuer"]
 
-    new_domain = cfgserv.service_url[:-1]
+    new_domain = cfgserv.service_url.rstrip("/")
 
     openid_metadata = cast(
         Dict[str, Any], replace_domain(openid_metadata, old_domain, new_domain)

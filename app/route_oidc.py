@@ -98,7 +98,8 @@ def well_known2():
 
 @oidc.route("/.well-known/oauth-authorization-server/frontend")
 def well_known3():
-    url = "https://dev.issuer.eudiw.dev/frontend/.well-known/oauth-authorization-server"
+    frontend_base = os.getenv("DEFAULT_FRONTEND_URL", "https://ec.dev.issuer.eudiw.dev")
+    url = f"{frontend_base}/.well-known/oauth-authorization-server"
     r = requests.get(url)
 
     return Response(
@@ -265,18 +266,23 @@ def auth_choice():
             pid_auth = False
 
     if country_selection == False and pid_auth == True:
-        return redirect(cfgservice.service_url + "oid4vp")
+        redirect_uri = cfgservice.service_url.rstrip("/") + "/oid4vp"
+        cfgservice.app_logger.info(f"Redirecting to: {redirect_uri} [302]")
+        return redirect(redirect_uri)
     elif country_selection == True and pid_auth == False:
-        return redirect(cfgservice.service_url + "dynamic/")
+        redirect_uri = cfgservice.service_url.rstrip("/") + "/dynamic/"
+        cfgservice.app_logger.info(f"Redirecting to: {redirect_uri} [302]")
+        return redirect(redirect_uri)
 
     error = ""
     if pid_auth == False and country_selection == False:
         error = "Combination of requested credentials is not valid!"
 
     target_url = ConfFrontend.registered_frontends[frontend_id]["url"]
-
+    redirect_uri = f"{target_url}/display_auth_method"
+    cfgservice.app_logger.info(f"POST redirect to: {redirect_uri} [payload: pid_auth={pid_auth}, country_selection={country_selection}, session_id={session_id}]")
     return post_redirect_with_payload(
-        target_url=f"{target_url}/display_auth_method",
+        target_url=redirect_uri,
         data_payload={
             "pid_auth": pid_auth,
             "country_selection": country_selection,
@@ -324,7 +330,11 @@ def verify_introspection(bearer_token):
 
     try:
         response = requests.request(
-            "POST", introspection_url, headers=headers, data=payload
+            "POST",
+            introspection_url,
+            headers=headers,
+            data=payload,
+            verify=cfgservice.auth_server_verify_tls,
         )
         response.raise_for_status()  # Raises an HTTPError for 4xx/5xx status codes
 
@@ -565,7 +575,33 @@ def generate_credentials(credential_request, session_id):
 
     json_data = json.dumps(data)
     headers = {"Content-Type": "application/json"}
-    _msg = requests.post(redirect_uri, data=json_data, headers=headers).json()
+
+    try:
+        response = requests.post(
+            redirect_uri,
+            data=json_data,
+            headers=headers,
+            verify=cfgservice.service_verify_tls,
+            timeout=30,
+        )
+        response.raise_for_status()
+        _msg = response.json()
+    except requests.exceptions.RequestException as e:
+        cfgservice.app_logger.error(
+            f", Session ID: {session_id}, internal credential generation request failed: {str(e)}"
+        )
+        return {
+            "error": "server_error",
+            "error_description": "Internal credential generation request failed.",
+        }
+    except ValueError as e:
+        cfgservice.app_logger.error(
+            f", Session ID: {session_id}, internal credential generation returned invalid JSON: {str(e)}"
+        )
+        return {
+            "error": "server_error",
+            "error_description": "Internal credential generation returned invalid JSON.",
+        }
 
     return _msg
 
@@ -865,7 +901,7 @@ def nonce():
     current_time = int(time.time())
 
     payload = {
-        "iss": cfgservice.service_url[:-1],
+        "iss": cfgservice.service_url.rstrip("/"),
         "iat": current_time,
         "exp": current_time + 3600,
         "source_endpoint": cfgservice.service_url + "nonce",
