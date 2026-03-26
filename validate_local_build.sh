@@ -41,4 +41,31 @@ python -m compileall app tests
 pytest tests/test_redirect_func.py
 bash -n patch_issuer_backend_local.sh run_backend.sh
 
-printf 'Validated issuer backend dependencies in %s\n' "$venv_dir"
+kill_listener_on_port() {
+  port="$1"
+  pids=$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
+  if [ -n "$pids" ]; then
+    kill $pids 2>/dev/null || true
+  fi
+}
+
+issuer_smoke_port=${ISSUER_PORT:-5002}
+
+if ! CI=true python - <<'PY'
+from app import create_app
+
+app = create_app({"TESTING": True})
+client = app.test_client()
+
+for path in ("/", "/.well-known/openid-credential-issuer"):
+    response = client.get(path)
+    if response.status_code != 200:
+        raise SystemExit(f"smoke test failed for {path}: {response.status_code}")
+PY
+then
+  kill_listener_on_port "$issuer_smoke_port"
+  printf 'Issuer backend smoke test failed\n' >&2
+  exit 1
+fi
+
+printf 'Validated issuer backend dependencies and smoke test in %s\n' "$venv_dir"

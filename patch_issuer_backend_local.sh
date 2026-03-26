@@ -70,26 +70,6 @@ PY
 
 python3 - <<PY
 from pathlib import Path
-
-files = [
-    Path("app/metadata_config/metadata_config.json"),
-    Path("app/metadata_config/openid-configuration.json"),
-    Path("app/metadata_config/oauth-authorization-server.json"),
-]
-
-for f in files:
-    text = f.read_text()
-    text = text.replace("https://issuer.eudiw.dev", "${ISSUER_BASE}")
-    text = text.replace("https://dev.issuer.eudiw.dev", "${ISSUER_BASE}")
-    text = text.replace("http://127.0.0.1:5000", "${ISSUER_BASE}")
-    text = text.replace("http://192.168.0.110:5000", "${ISSUER_BASE}")
-    text = text.replace("http://192.168.0.110:5002", "${ISSUER_BASE}")
-    f.write_text(text)
-    print("updated", f)
-PY
-
-python3 - <<PY
-from pathlib import Path
 import re
 
 p = Path("app/route_oidc.py")

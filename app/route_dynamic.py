@@ -481,6 +481,10 @@ def dynamic_R2():
     current_session = session_manager.get_session(session_id=user_id)
 
     country = current_session.country
+    if not country and current_session.user_data:
+        country = current_session.user_data.get("issuing_country")
+        if country:
+            session_manager.update_country(user_id, country)
 
     credential_request = json_request["credential_requests"]
 

@@ -179,7 +179,7 @@ def mdocFormatter(
     # Construct and sign the mdoc
     mdoci = MdocCborIssuer(private_key=cose_pkey, alg="ES256")
 
-    country = current_session.country
+    country = country or current_session.country
 
     revocation_json = None
     if country not in ("AV", "AV2"):

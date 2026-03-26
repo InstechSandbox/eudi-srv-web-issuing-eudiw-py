@@ -85,6 +85,16 @@ Click [here](install.md) for detailed instructions.
 
 For local LAN HTTPS development, see the helper-script workflow in [install.md](install.md#31-local-https-helper-scripts-for-lan-development).
 
+## 2A. Validation Smoke Test
+
+The repository includes [validate_local_build.sh](validate_local_build.sh) for local validation.
+
+The smoke phase validates that the issuer backend can construct the Flask application and serve both `/` and `/.well-known/openid-credential-issuer` through the in-process test client.
+
+If the smoke test fails, the script exits non-zero and attempts to stop any process already listening on the expected issuer backend port (`5002` by default) so a failed health signal does not leave a stale listener behind.
+
+Local metadata overrides for repeatable non-production environments are loaded from `support/metadata_overrides.json`, so you do not need to hand-edit `app/metadata_config/metadata_config.json` to reproduce the local or cloud setup.
+
 ## 3. Frequently Asked Questions
 
 ### A. How to make your local EUDIW Issuer available on the Internet?

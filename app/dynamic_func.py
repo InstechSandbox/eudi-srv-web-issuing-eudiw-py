@@ -43,13 +43,22 @@ from app import session_manager
 from formatter_func import mdocFormatter, sdjwtFormatter
 
 
+def _resolve_issuing_country(current_session, form_data):
+    if current_session and current_session.country:
+        return current_session.country
+    if isinstance(form_data, dict):
+        return form_data.get("issuing_country")
+    return None
+
+
 def dynamic_formatter(format, doctype, form_data, device_publickey, session_id):
 
     current_session = session_manager.get_session(session_id=session_id)
+    country = _resolve_issuing_country(current_session, form_data)
 
     if doctype == "org.iso.18013.5.1.mDL":
         un_distinguishing_sign = cfgcountries.supported_countries[
-            current_session.country
+            country
         ]["un_distinguishing_sign"]
     else:
         un_distinguishing_sign = ""
@@ -64,7 +73,7 @@ def dynamic_formatter(format, doctype, form_data, device_publickey, session_id):
         base64_mdoc = mdocFormatter(
             data=data,
             credential_metadata=requested_credential,
-            country=current_session.country,
+            country=country,
             device_publickey=device_publickey,
             session_id=session_id,
         )
@@ -76,7 +85,7 @@ def dynamic_formatter(format, doctype, form_data, device_publickey, session_id):
         r = json_post(
             url,
             {
-                "country": current_session.country,
+                "country": country,
                 "credential_metadata": requested_credential,
                 "device_publickey": device_publickey,
                 "data": data,
