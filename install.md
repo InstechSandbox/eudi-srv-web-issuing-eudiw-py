@@ -124,7 +124,7 @@ If you are running the local authorization server on port `5001`, this issuer ba
 3. Patch `app/.env` and related local metadata for your LAN host and local ports:
 
     ```shell
-    MYIP=192.168.0.110 AUTH_PORT=5001 ISSUER_PORT=5002 FRONTEND_PORT=5003 ./patch_issuer_backend_local.sh
+    MYIP=<your-lan-ip> AUTH_PORT=5001 ISSUER_PORT=5002 FRONTEND_PORT=5003 ./patch_issuer_backend_local.sh
     ```
 
     What this script does:

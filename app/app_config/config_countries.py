@@ -389,7 +389,7 @@ class ConfCountries:
 class ConfFrontend:
     registered_frontends = {
         cfgserv.default_frontend: {
-            "url": os.getenv("DEFAULT_FRONTEND_URL", "http://192.168.0.110:5003")
+            "url": os.getenv("DEFAULT_FRONTEND_URL", "https://ec.dev.issuer.eudiw.dev")
         },
         "6d725b3c-6d42-448e-8bfd-1eff1fcf152d": {
             "url": "https://age-verification.issuer.eudiw.dev"

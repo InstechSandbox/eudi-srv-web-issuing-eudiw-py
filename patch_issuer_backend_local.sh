@@ -1,68 +1,79 @@
 set -euo pipefail
 
-MYIP="${MYIP:-192.168.0.110}"
+detect_lan_ip() {
+    ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true
+}
+
+DETECTED_LAN_IP="$(detect_lan_ip)"
+
+MYIP="${MYIP:-${DETECTED_LAN_IP:-localhost}}"
 ISSUER_PORT="${ISSUER_PORT:-5002}"
 AUTH_PORT="${AUTH_PORT:-5001}"
 FRONTEND_PORT="${FRONTEND_PORT:-5003}"
 FRONTEND_ID="${FRONTEND_ID:-5d725b3c-6d42-448e-8bfd-1eff1fcf152d}"
+LOCAL_REPO_ROOT="${LOCAL_REPO_ROOT:-$(pwd -P)}"
 ISSUER_CERT_FILE="${ISSUER_CERT_FILE:-server.crt}"
 ISSUER_KEY_FILE="${ISSUER_KEY_FILE:-server.key}"
 
 ISSUER_BASE="https://${MYIP}:${ISSUER_PORT}"
 VERIFY_USER_ENDPOINT="https://${MYIP}:${AUTH_PORT}/verify/user"
-AUTH_INTERNAL="http://127.0.0.1:${AUTH_PORT}"
+AUTH_INTERNAL="https://127.0.0.1:${AUTH_PORT}"
 FRONTEND_BASE="https://${MYIP}:${FRONTEND_PORT}"
 
 mkdir -p /tmp/log_dev
 
-python3 - <<PY
+MYIP="$MYIP" \
+ISSUER_PORT="$ISSUER_PORT" \
+AUTH_PORT="$AUTH_PORT" \
+FRONTEND_PORT="$FRONTEND_PORT" \
+FRONTEND_ID="$FRONTEND_ID" \
+LOCAL_REPO_ROOT="$LOCAL_REPO_ROOT" \
+python3 - <<'PY'
 from pathlib import Path
+import os
+import re
 
 p = Path("app/.env")
 text = p.read_text()
 
-replacements = {
-    "SERVICE_URL=http://127.0.0.1:5000": f"SERVICE_URL=${ISSUER_BASE}",
-    "SERVICE_URL=http://192.168.0.110:5000": f"SERVICE_URL=${ISSUER_BASE}",
-    "SERVICE_URL=http://192.168.0.110:5002": f"SERVICE_URL=${ISSUER_BASE}",
+myip = os.environ["MYIP"]
+issuer_port = os.environ["ISSUER_PORT"]
+auth_port = os.environ["AUTH_PORT"]
+frontend_port = os.environ["FRONTEND_PORT"]
+frontend_id = os.environ["FRONTEND_ID"]
+local_repo_root = os.environ["LOCAL_REPO_ROOT"]
 
-    "AUTH_SERVER_INTERNAL_URL=http://host.docker.internal:6005": f"AUTH_SERVER_INTERNAL_URL=${AUTH_INTERNAL}",
-    "AUTH_SERVER_INTERNAL_URL=http://127.0.0.1:6005": f"AUTH_SERVER_INTERNAL_URL=${AUTH_INTERNAL}",
-    "AUTH_SERVER_INTERNAL_URL=http://192.168.0.110:5001": f"AUTH_SERVER_INTERNAL_URL=${AUTH_INTERNAL}",
-    "AUTH_SERVER_INTERNAL_URL=http://127.0.0.1:5001": f"AUTH_SERVER_INTERNAL_URL=${AUTH_INTERNAL}",
+def set_env_line(text: str, key: str, value: str) -> str:
+    pattern = rf'^{re.escape(key)}=.*$'
+    replacement = f'{key}={value}'
+    if re.search(pattern, text, flags=re.MULTILINE):
+        return re.sub(pattern, replacement, text, count=1, flags=re.MULTILINE)
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text + replacement + "\n"
 
-    "VERIFY_USER_ENDPOINT=http://127.0.0.1:5000/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=http://192.168.0.110:5000/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=http://192.168.0.110:5002/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=http://127.0.0.1:5000/oidc/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=http://192.168.0.110:5000/oidc/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=http://192.168.0.110:5002/oidc/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://127.0.0.1:5000/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://192.168.0.110:5000/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://192.168.0.110:5002/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://127.0.0.1:5000/oidc/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://192.168.0.110:5000/oidc/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://192.168.0.110:5002/oidc/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://dev.issuer.eudiw.dev/oidc/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
-    "VERIFY_USER_ENDPOINT=https://dev.issuer.eudiw.dev/verify/user": f"VERIFY_USER_ENDPOINT=${VERIFY_USER_ENDPOINT}",
+for key, value in {
+    "MYIP": myip,
+    "ISSUER_PORT": issuer_port,
+    "AUTH_PORT": auth_port,
+    "FRONTEND_PORT": frontend_port,
+    "FRONTEND_ID": frontend_id,
+    "LOCAL_REPO_ROOT": local_repo_root,
+    "SERVICE_URL": "https://${MYIP}:${ISSUER_PORT}",
+    "DEFAULT_FRONTEND": frontend_id,
+    "DEFAULT_FRONTEND_URL": "https://${MYIP}:${FRONTEND_PORT}",
+    "TRUSTED_CAS_PATH": "${LOCAL_REPO_ROOT}/local/cert/",
+    "PRIVKEY_PATH": "${LOCAL_REPO_ROOT}/local/privKey/",
+    "NONCE_KEY": "${LOCAL_REPO_ROOT}/local/privKey/nonce_rsa2048.pem",
+    "CREDENTIAL_KEY": "${LOCAL_REPO_ROOT}/local/privKey/credential_request_ec.pem",
+    "AUTH_SERVER_INTERNAL_URL": "https://127.0.0.1:${AUTH_PORT}",
+    "VERIFY_USER_ENDPOINT": "https://${MYIP}:${AUTH_PORT}/verify/user",
+    "REVOCATION_SERVICE_URL": "https://${MYIP}:${ISSUER_PORT}/token_status_list/take",
+    "REVOKE_SERVICE_URL": "https://${MYIP}:${ISSUER_PORT}/token_status_list/set",
+}.items():
+    text = set_env_line(text, key, value)
 
-    "REVOCATION_SERVICE_URL=http://127.0.0.1:5000/token_status_list/take": f"REVOCATION_SERVICE_URL=${ISSUER_BASE}/token_status_list/take",
-    "REVOCATION_SERVICE_URL=http://192.168.0.110:5000/token_status_list/take": f"REVOCATION_SERVICE_URL=${ISSUER_BASE}/token_status_list/take",
-    "REVOCATION_SERVICE_URL=http://192.168.0.110:5002/token_status_list/take": f"REVOCATION_SERVICE_URL=${ISSUER_BASE}/token_status_list/take",
 
-    "REVOKE_SERVICE_URL=http://127.0.0.1:5000/token_status_list/set": f"REVOKE_SERVICE_URL=${ISSUER_BASE}/token_status_list/set",
-    "REVOKE_SERVICE_URL=http://192.168.0.110:5000/token_status_list/set": f"REVOKE_SERVICE_URL=${ISSUER_BASE}/token_status_list/set",
-    "REVOKE_SERVICE_URL=http://192.168.0.110:5002/token_status_list/set": f"REVOKE_SERVICE_URL=${ISSUER_BASE}/token_status_list/set",
-
-    "DEFAULT_FRONTEND_URL=https://ec.dev.issuer.eudiw.dev": f"DEFAULT_FRONTEND_URL=${FRONTEND_BASE}",
-}
-for old, new in replacements.items():
-    text = text.replace(old, new)
-
-if "DEFAULT_FRONTEND=" not in text:
-    text += f"\\nDEFAULT_FRONTEND=${FRONTEND_ID}\\n"
-if "DEFAULT_FRONTEND_URL=" not in text:
-    text += f"\\nDEFAULT_FRONTEND_URL=${FRONTEND_BASE}\\n"
 
 p.write_text(text)
 print("updated", p)
@@ -102,6 +113,27 @@ text = text.replace("5d725b3c-6d42-448e-8bfd-1eff1fcf152d", "${FRONTEND_ID}")
 
 p.write_text(text)
 print("checked", p)
+PY
+
+python3 - <<PY
+import json
+import re
+from pathlib import Path
+
+issuer_base = "${ISSUER_BASE}"
+issuer_oidc_base = f"{issuer_base}/oidc"
+
+files = {
+    Path("app/metadata_config/metadata_config.json"): issuer_base,
+    Path("app/metadata_config/openid-configuration.json"): issuer_oidc_base,
+    Path("app/metadata_config/oauth-authorization-server.json"): issuer_base,
+}
+
+for path, base in files.items():
+    text = path.read_text()
+    text = re.sub(r"https?://[^\"\s]+", lambda match: re.sub(r"^https?://[^/]+(?:/oidc)?", base, match.group(0)), text)
+    path.write_text(text)
+    print("updated", path)
 PY
 
 echo

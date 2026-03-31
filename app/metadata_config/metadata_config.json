@@ -1,12 +1,12 @@
 {
-   "credential_issuer":"https://192.168.0.110:5002",
+   "credential_issuer":"https://192.168.0.166:5002",
    "authorization_servers":[
-      "https://192.168.0.110:5002/oidc"
+      "https://192.168.0.166:5002"
    ],
-   "credential_endpoint":"https://192.168.0.110:5002/credential",
-   "nonce_endpoint":"https://192.168.0.110:5002/nonce",
-   "deferred_credential_endpoint":"https://192.168.0.110:5002/deferred_credential",
-   "notification_endpoint":"https://192.168.0.110:5002/notification",
+   "credential_endpoint":"https://192.168.0.166:5002/credential",
+   "nonce_endpoint":"https://192.168.0.166:5002/nonce",
+   "deferred_credential_endpoint":"https://192.168.0.166:5002/deferred_credential",
+   "notification_endpoint":"https://192.168.0.166:5002/notification",
    "batch_credential_issuance":{
       "batch_size":100
    },
@@ -54,7 +54,7 @@
          "name":"Digital Credentials Issuer",
          "locale":"en",
          "logo":{
-            "uri":"https://192.168.0.110:5002/ic-logo.png",
+            "uri":"https://192.168.0.166:5002/ic-logo.png",
             "alt_text":"EU Digital Identity Wallet Logo"
          }
       }
