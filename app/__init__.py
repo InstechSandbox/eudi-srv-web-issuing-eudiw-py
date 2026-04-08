@@ -120,15 +120,34 @@ def _load_metadata_overrides(dir_path: str) -> Dict[str, Any]:
         os.path.join(os.path.dirname(dir_path), "support", "metadata_overrides.json")
     )
 
+    merged_overrides: Dict[str, Any] = {}
+
     for override_path in override_paths:
         if os.path.isfile(override_path):
             with open(override_path, encoding="utf-8") as override_file:
-                return json.load(override_file)
+                file_overrides = json.load(override_file)
+                if isinstance(file_overrides, dict):
+                    _deep_merge_dict(merged_overrides, file_overrides)
 
-    return {}
+    return merged_overrides
 
 
-def _apply_metadata_overrides(metadata: Dict[str, Any], overrides: Dict[str, Any]) -> None:
+def _deep_merge_dict(target: Dict[str, Any], overrides: Dict[str, Any]) -> None:
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_merge_dict(target[key], value)
+        else:
+            target[key] = value
+
+
+def _apply_metadata_overrides(
+    metadata: Dict[str, Any], overrides: Dict[str, Any], override_key: str = ""
+) -> None:
+    if override_key:
+        metadata_override = overrides.get(override_key)
+        if isinstance(metadata_override, dict):
+            _deep_merge_dict(metadata, metadata_override)
+
     credential_request_encryption = metadata.get("credential_request_encryption")
     if not isinstance(credential_request_encryption, dict):
         return
@@ -164,8 +183,18 @@ def setup_metadata():
             oidc_metadata_clean = copy.deepcopy(oidc_metadata)
 
         metadata_overrides = _load_metadata_overrides(dir_path)
-        _apply_metadata_overrides(oidc_metadata, metadata_overrides)
-        _apply_metadata_overrides(oidc_metadata_clean, metadata_overrides)
+        _apply_metadata_overrides(
+            openid_metadata, metadata_overrides, "openid_configuration"
+        )
+        _apply_metadata_overrides(
+            oauth_metadata, metadata_overrides, "oauth_authorization_server"
+        )
+        _apply_metadata_overrides(
+            oidc_metadata, metadata_overrides, "credential_issuer_metadata"
+        )
+        _apply_metadata_overrides(
+            oidc_metadata_clean, metadata_overrides, "credential_issuer_metadata"
+        )
 
         for file in os.listdir(dir_path + "/metadata_config/credentials_supported/"):
             if file.endswith("json"):

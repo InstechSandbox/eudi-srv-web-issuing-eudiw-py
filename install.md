@@ -132,12 +132,13 @@ If you are running the local authorization server on port `5001`, this issuer ba
     + rewrites `app/.env` with local service URLs and the local frontend URL
     + sets `VERIFY_USER_ENDPOINT` to the local authorization server
     + points revocation URLs at the local backend
-    + updates local metadata files to use the current backend base URL
-    + adjusts the backend route that resolves the frontend OAuth metadata endpoint
+    + generates a local metadata override file to use the current backend base URL without rewriting tracked metadata JSON
+    + ensures the configured trusted CA directory exists so local startup does not fail before any certificates are added
 
     Notes:
 
-    + this script modifies tracked files in place; review the resulting diff before committing
+    + this script keeps tracked source files unchanged and relies on generated local runtime overrides for metadata
+    + if `app/.env` does not exist yet, the script bootstraps it from `app/.env.example`
     + it is intended for local development, not production deployment
     + it does not create `server.crt` or `server.key`; generate those separately if needed
 
