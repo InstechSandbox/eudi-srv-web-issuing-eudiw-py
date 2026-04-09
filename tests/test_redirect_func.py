@@ -41,7 +41,9 @@ class TestRedirectFunc:
         assert "a=1" in result and "b=2" in result
 
     @patch("app.redirect_func.requests.post")
-    def test_json_post_success(self, mock_post):
+    @patch("app.redirect_func.cfgserv")
+    def test_json_post_success(self, mock_cfgserv, mock_post):
+        mock_cfgserv.service_verify_tls = False
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_post.return_value = mock_resp
@@ -50,7 +52,27 @@ class TestRedirectFunc:
         payload = {"key": "value"}
         resp = rf.json_post(url, payload)
         mock_post.assert_called_once_with(
-            url, json=payload, headers={"Content-Type": "application/json"}
+            url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            verify=False,
+        )
+        assert resp.status_code == 200
+
+    @patch("app.redirect_func.requests.post")
+    def test_json_post_honors_explicit_verify_override(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_post.return_value = mock_resp
+
+        url = "http://example.com"
+        payload = {"key": "value"}
+        resp = rf.json_post(url, payload, verify="/tmp/test-ca.pem")
+        mock_post.assert_called_once_with(
+            url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            verify="/tmp/test-ca.pem",
         )
         assert resp.status_code == 200
 

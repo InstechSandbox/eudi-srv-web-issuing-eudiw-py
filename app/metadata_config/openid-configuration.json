@@ -13,7 +13,7 @@
       "urn:ietf:params:oauth:grant-type:jwt-bearer",
       "refresh_token"
    ],
-   "jwks_uri":"https://192.168.0.166:5002/oidc/static/jwks.json",
+   "jwks_uri":"https://192.168.0.131:5002/oidc/static/jwks.json",
    "scopes_supported":[
       "openid"
    ],
@@ -92,12 +92,12 @@
    "code_challenge_methods_supported":[
       "S256"
    ],
-   "issuer":"https://192.168.0.166:5002/oidc",
-   "registration_endpoint":"https://192.168.0.166:5002/oidc/registration",
-   "introspection_endpoint":"https://192.168.0.166:5002/oidc/introspection",
-   "authorization_endpoint":"https://192.168.0.166:5002/oidc/authorization",
-   "token_endpoint":"https://192.168.0.166:5002/oidc/token",
-   "userinfo_endpoint":"https://192.168.0.166:5002/oidc/userinfo",
-   "end_session_endpoint":"https://192.168.0.166:5002/oidc/session",
-   "pushed_authorization_request_endpoint":"https://192.168.0.166:5002/oidc/pushed_authorization"
+   "issuer":"https://192.168.0.131:5002/oidc",
+   "registration_endpoint":"https://192.168.0.131:5002/oidc/registration",
+   "introspection_endpoint":"https://192.168.0.131:5002/oidc/introspection",
+   "authorization_endpoint":"https://192.168.0.131:5002/oidc/authorization",
+   "token_endpoint":"https://192.168.0.131:5002/oidc/token",
+   "userinfo_endpoint":"https://192.168.0.131:5002/oidc/userinfo",
+   "end_session_endpoint":"https://192.168.0.131:5002/oidc/session",
+   "pushed_authorization_request_endpoint":"https://192.168.0.131:5002/oidc/pushed_authorization"
 }

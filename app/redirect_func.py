@@ -41,17 +41,24 @@ def url_get(url_path: str, args: dict):
     return url_path + "?" + urllib.parse.urlencode(args)
 
 
-def json_post(url_path: str, json: dict):
+def json_post(url_path: str, json: dict, verify=None):
     """Executes the HTTP POST to url_path with json payload
 
     Keyword arguments:
     + url_path -- URL to POST
     + json -- json payload dictionary (key: value)
+    + verify -- optional TLS verification override
 
     Return: Returns the answer to the HTTP POST
     """
+    if verify is None:
+        verify = cfgserv.service_verify_tls
+
     return requests.post(
-        url_path, json=json, headers={"Content-Type": "application/json"}
+        url_path,
+        json=json,
+        headers={"Content-Type": "application/json"},
+        verify=verify,
     )
 
 

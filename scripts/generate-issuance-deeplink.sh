@@ -35,7 +35,7 @@ else
   issuer_backend_url="https://localhost:5002"
 fi
 
-credential_configuration_id=${CREDENTIAL_CONFIGURATION_ID:-eu.europa.ec.eudi.pid_mdoc}
+credential_configuration_id=${CREDENTIAL_CONFIGURATION_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}
 credential_offer_scheme=${CREDENTIAL_OFFER_SCHEME:-haip-vci://}
 adb_bin=${ADB_BIN:-$(detect_adb_bin)}
 android_serial=${ANDROID_SERIAL:-}
