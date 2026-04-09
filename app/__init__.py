@@ -110,15 +110,15 @@ def fix_key_attestations(data):
 
 def _load_metadata_overrides(dir_path: str) -> Dict[str, Any]:
     override_paths = []
+    override_paths.append(
+        os.path.join(os.path.dirname(dir_path), "support", "metadata_overrides.json")
+    )
+
     configured_path = os.getenv("ISSUER_METADATA_OVERRIDES_FILE") or os.getenv(
         "METADATA_OVERRIDES_FILE"
     )
     if configured_path:
         override_paths.append(configured_path)
-
-    override_paths.append(
-        os.path.join(os.path.dirname(dir_path), "support", "metadata_overrides.json")
-    )
 
     merged_overrides: Dict[str, Any] = {}
 
