@@ -79,12 +79,15 @@ def _resolve_first_existing(candidates):
 
 def _resolve_utopia_privkey_and_password():
     candidates = [
-        (cfgserv.privKey_path + "PID-DS-0001_UT.pem", None),
+        (cfgserv.privKey_path + "PID-DS-LOCAL-UT.pem", None),
         (cfgserv.privKey_path + "PID-DS-0002-decrypted.key.pem", None),
         (cfgserv.privKey_path + "PID-DS-0002.pid-ds-0002.key.pem", b"pid-ds-0002"),
+        (cfgserv.privKey_path + "PID-DS-0001_UT.pem", None),
     ]
 
-    primary_candidate = candidates[0]
+    primary_candidate = (cfgserv.privKey_path + "PID-DS-0001_UT.pem", None)
+    if os.path.exists(candidates[0][0]):
+        return candidates[0]
     if os.path.exists(primary_candidate[0]):
         return primary_candidate
 
@@ -105,8 +108,9 @@ UTOPIA_PID_MDOC_CERT = _resolve_first_existing(
     [cfgserv.trusted_CAs_path + "PID-DS-0001_UT_cert.der"]
     if not cfgserv.allow_local_utopia_signer_fallback
     else [
-        cfgserv.trusted_CAs_path + "PID-DS-0001_UT_cert.der",
+        cfgserv.trusted_CAs_path + "PID-DS-LOCAL-UT_cert.der",
         cfgserv.trusted_CAs_path + "PID-DS-0002.cert.der",
+        cfgserv.trusted_CAs_path + "PID-DS-0001_UT_cert.der",
     ]
 )
 
@@ -114,13 +118,15 @@ UTOPIA_PID_MDOC_CERT = _resolve_first_existing(
 def _resolve_age_verification_signer():
     default_privkey = cfgserv.privKey_path + "AgeVerificationDS-001.pem"
     fallback_privkeys = [
-        default_privkey,
+        cfgserv.privKey_path + "PID-DS-LOCAL-UT.pem",
         cfgserv.privKey_path + "PID-DS-0002-decrypted.key.pem",
+        default_privkey,
     ]
     default_cert = cfgserv.trusted_CAs_path + "AgeVerificationDS-001_cert.der"
     fallback_certs = [
-        default_cert,
+        cfgserv.trusted_CAs_path + "PID-DS-LOCAL-UT_cert.der",
         cfgserv.trusted_CAs_path + "PID-DS-0002.cert.der",
+        default_cert,
     ]
 
     if not cfgserv.allow_local_utopia_signer_fallback:

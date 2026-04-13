@@ -168,7 +168,7 @@ class TestMdocFormatter:
         device_publickey,
         session_id,
     ):
-        """Batch credential: issuance_date adjusted to 00:00:00"""
+        """Batch credential: issuance_date still uses current signing time."""
         # Mock session
         mock_session = MagicMock()
         mock_session.is_batch_credential = True
@@ -204,11 +204,10 @@ class TestMdocFormatter:
             session_id=session_id,
         )
 
-        # Check that issuance_date has time set to 00:00:00
+        # Check that issuance_date keeps a real signing timestamp instead of truncating to midnight.
         called_validity = mock_mdoci_instance.new.call_args.kwargs["validity"]
-        assert called_validity["issuance_date"].hour == 0
-        assert called_validity["issuance_date"].minute == 0
-        assert called_validity["issuance_date"].second == 0
+        assert called_validity["issuance_date"].tzinfo == datetime.timezone.utc
+        assert called_validity["issuance_date"] <= called_validity["expiry_date"]
 
         assert result == b"signed_mdoc_batch"
 

@@ -30,16 +30,53 @@ mkdir -p "$LOCAL_RUNTIME_DIR"
 mkdir -p "$TRUSTED_CAS_PATH"
 mkdir -p "$LOCAL_PRIVKEY_DIR"
 
-UTOPIA_SIGNER_KEY_PATH="$LOCAL_PRIVKEY_DIR/PID-DS-0001_UT.pem"
-UTOPIA_SIGNER_CERT_DER_PATH="$TRUSTED_CAS_PATH/PID-DS-0001_UT_cert.der"
-UTOPIA_SIGNER_CERT_PEM_PATH="$TRUSTED_CAS_PATH/PID-DS-0001_UT_cert.pem"
+resolve_first_existing_path() {
+    local fallback=$1
+    shift
+
+    local candidate
+    for candidate in "$@"; do
+        if [[ -f "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    printf '%s\n' "$fallback"
+}
+
+UTOPIA_SIGNER_KEY_PATH="${UTOPIA_SIGNER_KEY_PATH:-$(resolve_first_existing_path \
+    "$LOCAL_PRIVKEY_DIR/PID-DS-LOCAL-UT.pem" \
+    "$LOCAL_PRIVKEY_DIR/PID-DS-LOCAL-UT.pem" \
+    "$LOCAL_PRIVKEY_DIR/PID-DS-0001_UT.pem")}"
+UTOPIA_SIGNER_CERT_DER_PATH="${UTOPIA_SIGNER_CERT_DER_PATH:-$(resolve_first_existing_path \
+    "$TRUSTED_CAS_PATH/PID-DS-LOCAL-UT_cert.der" \
+    "$TRUSTED_CAS_PATH/PID-DS-LOCAL-UT_cert.der" \
+    "$TRUSTED_CAS_PATH/PID-DS-0001_UT_cert.der")}"
+UTOPIA_SIGNER_CERT_PEM_PATH="${UTOPIA_SIGNER_CERT_PEM_PATH:-$(resolve_first_existing_path \
+    "$TRUSTED_CAS_PATH/PID-DS-LOCAL-UT_cert.pem" \
+    "$TRUSTED_CAS_PATH/PID-DS-LOCAL-UT_cert.pem" \
+    "$TRUSTED_CAS_PATH/PID-DS-0001_UT_cert.pem")}"
 
 seed_local_utopia_signer() {
     [[ -n "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR" ]] || return 0
 
-    local source_key="$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/privKey/PID-DS-0001_UT.pem"
-    local source_cert_der="$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-0001_UT_cert.der"
-    local source_cert_pem="$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-0001_UT_cert.pem"
+    local source_key
+    local source_cert_der
+    local source_cert_pem
+
+    source_key=$(resolve_first_existing_path \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/privKey/PID-DS-LOCAL-UT.pem" \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/privKey/PID-DS-LOCAL-UT.pem" \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/privKey/PID-DS-0001_UT.pem")
+    source_cert_der=$(resolve_first_existing_path \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-LOCAL-UT_cert.der" \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-LOCAL-UT_cert.der" \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-0001_UT_cert.der")
+    source_cert_pem=$(resolve_first_existing_path \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-LOCAL-UT_cert.pem" \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-LOCAL-UT_cert.pem" \
+        "$LOCAL_UTOPIA_SIGNER_SOURCE_DIR/cert/PID-DS-0001_UT_cert.pem")
 
     if [[ ! -f "$UTOPIA_SIGNER_KEY_PATH" && -f "$source_key" ]]; then
         cp "$source_key" "$UTOPIA_SIGNER_KEY_PATH"
@@ -67,11 +104,13 @@ require_local_utopia_signer() {
     echo "Missing required local Utopia signer assets:" >&2
     printf '  %s\n' "${missing[@]}" >&2
     echo >&2
-    echo "Set LOCAL_UTOPIA_SIGNER_SOURCE_DIR to a local issuer checkout or seed directory containing:" >&2
-    echo "  privKey/PID-DS-0001_UT.pem" >&2
-    echo "  cert/PID-DS-0001_UT_cert.der" >&2
+    echo "Generate the local signer chain with project-docs/scripts/generate-local-mdoc-signer-chain.sh" >&2
+    echo "or set LOCAL_UTOPIA_SIGNER_SOURCE_DIR to a seed directory containing one of:" >&2
+    echo "  privKey/PID-DS-LOCAL-UT.pem" >&2
+    echo "  cert/PID-DS-LOCAL-UT_cert.der" >&2
     echo "Optional:" >&2
-    echo "  cert/PID-DS-0001_UT_cert.pem" >&2
+    echo "  cert/PID-DS-LOCAL-UT_cert.pem" >&2
+    echo "Legacy fallback is still supported with PID-DS-0001_UT filenames." >&2
     exit 1
 }
 
@@ -195,6 +234,15 @@ credential_request_key = jwk.JWK.from_pem(credential_key_path.read_bytes())
 credential_request_jwk = json.loads(credential_request_key.export(private_key=False))
 credential_request_jwk["use"] = "enc"
 credential_request_jwk["alg"] = "ECDH-ES"
+
+credential_issuer_metadata = overrides.get("credential_issuer_metadata")
+if isinstance(credential_issuer_metadata, dict):
+    credential_request_encryption = credential_issuer_metadata.get(
+        "credential_request_encryption"
+    )
+    if isinstance(credential_request_encryption, dict):
+        credential_request_encryption["jwks"] = {"keys": [credential_request_jwk]}
+
 overrides["credential_request_encryption_jwk"] = credential_request_jwk
 
 output_path.write_text(json.dumps(overrides, indent=2))

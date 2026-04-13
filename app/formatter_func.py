@@ -131,12 +131,7 @@ def mdocFormatter(
     # Extract the key parameters
     priv_d = private_key.private_numbers().private_value
 
-    if current_session.is_batch_credential:
-        issuance_date = datetime.datetime.now(datetime.timezone.utc).replace(
-            hour=0, minute=0, second=0
-        )
-    else:
-        issuance_date = datetime.datetime.now(datetime.timezone.utc)
+    issuance_date = datetime.datetime.now(datetime.timezone.utc)
 
     expiry_date = issuance_date + datetime.timedelta(
         days=credential_metadata["issuer_config"]["validity"]
