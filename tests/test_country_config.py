@@ -16,6 +16,11 @@
 #
 ###############################################################################
 import pytest
+from datetime import datetime, timedelta
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 from app.app_config import config_countries
 
 
@@ -99,3 +104,57 @@ class TestConfFrontend:
             assert isinstance(frontend_id, str)
             assert "url" in data
             assert data["url"].startswith("https://")
+
+
+def test_utopia_signer_cert_is_rewritten_for_service_url(tmp_path):
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    key_path = tmp_path / "PID-DS-0001_UT.pem"
+    key_path.write_bytes(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+
+    stale_certificate = (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Local Utopia DS")]))
+        .issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Local Utopia DS")]))
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow())
+        .not_valid_after(datetime.utcnow() + timedelta(days=30))
+        .add_extension(
+            x509.SubjectAlternativeName(
+                [x509.UniformResourceIdentifier("https://192.168.0.131:5002")]
+            ),
+            critical=False,
+        )
+        .sign(private_key, hashes.SHA256())
+    )
+
+    cert_path = tmp_path / "PID-DS-0001_UT_cert.der"
+    cert_path.write_bytes(stale_certificate.public_bytes(serialization.Encoding.DER))
+
+    updated_cert_path = config_countries._ensure_utopia_signer_cert_matches_service_url(
+        str(cert_path),
+        str(key_path),
+        None,
+        "https://issuer-api.test.instech-eudi-poc.com/",
+    )
+
+    updated_certificate = x509.load_der_x509_certificate(
+        tmp_path.joinpath("PID-DS-0001_UT_cert.der").read_bytes()
+    )
+    subject_alt_name = updated_certificate.extensions.get_extension_for_class(
+        x509.SubjectAlternativeName
+    ).value
+
+    assert updated_cert_path == str(cert_path)
+    assert subject_alt_name.get_values_for_type(x509.UniformResourceIdentifier) == [
+        "https://issuer-api.test.instech-eudi-poc.com"
+    ]
+    assert subject_alt_name.get_values_for_type(x509.DNSName) == [
+        "issuer-api.test.instech-eudi-poc.com"
+    ]

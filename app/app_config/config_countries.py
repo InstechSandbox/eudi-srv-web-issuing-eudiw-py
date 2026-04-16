@@ -24,7 +24,15 @@ This config_countries.py contains configuration data related to the countries su
 NOTE: You should only change it if you understand what you're doing.
 """
 
+import ipaddress
 import os
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.x509.oid import NameOID
+
 from .config_service import ConfService as cfgserv
 
 EIDAS_LOA_HIGH = "http://eidas.europa.eu/LoA/high"
@@ -101,6 +109,121 @@ def _resolve_utopia_privkey_and_password():
     return primary_candidate
 
 
+def _expected_service_uri(service_url):
+    parsed_service_url = urlparse(service_url.rstrip("/"))
+    if parsed_service_url.scheme != "https" or not parsed_service_url.netloc:
+        return None
+    return f"{parsed_service_url.scheme}://{parsed_service_url.netloc}"
+
+
+def _load_certificate(cert_path):
+    if not os.path.exists(cert_path):
+        return None
+
+    with open(cert_path, "rb") as cert_file:
+        cert_bytes = cert_file.read()
+
+    try:
+        return x509.load_der_x509_certificate(cert_bytes)
+    except ValueError:
+        return x509.load_pem_x509_certificate(cert_bytes)
+
+
+def _certificate_has_expected_san(certificate, expected_uri):
+    try:
+        subject_alt_name = certificate.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        ).value
+    except x509.ExtensionNotFound:
+        return False
+
+    uri_values = [
+        uri_value.rstrip("/")
+        for uri_value in subject_alt_name.get_values_for_type(
+            x509.UniformResourceIdentifier
+        )
+    ]
+    dns_values = subject_alt_name.get_values_for_type(x509.DNSName)
+    ip_values = {
+        str(ip_value) for ip_value in subject_alt_name.get_values_for_type(x509.IPAddress)
+    }
+
+    expected_host = urlparse(expected_uri).hostname
+    return expected_uri.rstrip("/") in uri_values or expected_host in dns_values or expected_host in ip_values
+
+
+def _build_san_entries(expected_uri):
+    parsed_service_url = urlparse(expected_uri)
+    expected_host = parsed_service_url.hostname
+    san_entries = [x509.UniformResourceIdentifier(expected_uri.rstrip("/"))]
+    if not expected_host:
+        return san_entries
+
+    try:
+        san_entries.append(x509.IPAddress(ipaddress.ip_address(expected_host)))
+    except ValueError:
+        san_entries.append(x509.DNSName(expected_host))
+
+    return san_entries
+
+
+def _ensure_utopia_signer_cert_matches_service_url(
+    cert_path, privkey_path, privkey_password, service_url
+):
+    expected_uri = _expected_service_uri(service_url)
+    if not expected_uri or not os.path.exists(privkey_path):
+        return cert_path
+
+    try:
+        certificate = _load_certificate(cert_path)
+        if certificate and _certificate_has_expected_san(certificate, expected_uri):
+            return cert_path
+
+        if not certificate:
+            return cert_path
+
+        with open(privkey_path, "rb") as key_file:
+            private_key = serialization.load_pem_private_key(
+                key_file.read(),
+                password=privkey_password,
+            )
+
+        now = datetime.now(timezone.utc)
+        subject = certificate.subject or x509.Name(
+            [x509.NameAttribute(NameOID.COMMON_NAME, "Utopia DS")]
+        )
+        regenerated_certificate = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(subject)
+            .public_key(private_key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5))
+            .not_valid_after(now + timedelta(days=3650))
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .add_extension(
+                x509.SubjectAlternativeName(_build_san_entries(expected_uri)),
+                critical=False,
+            )
+            .sign(private_key, hashes.SHA256())
+        )
+
+        with open(cert_path, "wb") as cert_file:
+            cert_file.write(
+                regenerated_certificate.public_bytes(serialization.Encoding.DER)
+            )
+
+        pem_path = os.path.splitext(cert_path)[0] + ".pem"
+        with open(pem_path, "wb") as pem_file:
+            pem_file.write(
+                regenerated_certificate.public_bytes(serialization.Encoding.PEM)
+            )
+    except (OSError, TypeError, ValueError):
+        return cert_path
+
+    return cert_path
+
+
 UTOPIA_PID_MDOC_PRIVKEY, UTOPIA_PID_MDOC_PRIVKEY_PASSWORD = (
     _resolve_utopia_privkey_and_password()
 )
@@ -112,6 +235,12 @@ UTOPIA_PID_MDOC_CERT = _resolve_first_existing(
         cfgserv.trusted_CAs_path + "PID-DS-0002.cert.der",
         cfgserv.trusted_CAs_path + "PID-DS-0001_UT_cert.der",
     ]
+)
+UTOPIA_PID_MDOC_CERT = _ensure_utopia_signer_cert_matches_service_url(
+    UTOPIA_PID_MDOC_CERT,
+    UTOPIA_PID_MDOC_PRIVKEY,
+    UTOPIA_PID_MDOC_PRIVKEY_PASSWORD,
+    cfgserv.service_url,
 )
 
 

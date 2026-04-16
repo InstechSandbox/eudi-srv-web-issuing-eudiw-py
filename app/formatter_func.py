@@ -24,7 +24,8 @@ This formatter_func.py file contains formatter related auxiliary functions.
 """
 import base64
 import cbor2
-from cryptography.hazmat.primitives import serialization
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
 from pymdoccbor.mdoc.issuer import MdocCborIssuer
 import datetime
 import hashlib
@@ -49,6 +50,41 @@ from app_config.config_countries import ConfCountries as cfgcountries
 from app_config.config_service import ConfService as cfgservice
 
 from app import session_manager
+
+
+def _certificate_log_summary(certificate_bytes):
+    try:
+        certificate = x509.load_der_x509_certificate(certificate_bytes)
+    except ValueError:
+        certificate = x509.load_pem_x509_certificate(certificate_bytes)
+
+    try:
+        subject_alt_name = certificate.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        ).value
+        san_entries = []
+        san_entries.extend(
+            f"uri:{value}"
+            for value in subject_alt_name.get_values_for_type(
+                x509.UniformResourceIdentifier
+            )
+        )
+        san_entries.extend(
+            f"dns:{value}" for value in subject_alt_name.get_values_for_type(x509.DNSName)
+        )
+        san_entries.extend(
+            f"ip:{value}"
+            for value in subject_alt_name.get_values_for_type(x509.IPAddress)
+        )
+    except x509.ExtensionNotFound:
+        san_entries = []
+
+    return {
+        "subject": certificate.subject.rfc4514_string(),
+        "issuer": certificate.issuer.rfc4514_string(),
+        "san": san_entries,
+        "sha256": certificate.fingerprint(hashes.SHA256()).hex(),
+    }
 
 
 def _handle_revocation_failure(message):
@@ -352,10 +388,19 @@ def sdjwtFormatter(PID, country):
 
     claims.update(datafinal)
 
-    with open(
-        cfgcountries.supported_countries[country]["pid_mdoc_cert"], "rb"
-    ) as certificate:
+    certificate_path = cfgcountries.supported_countries[country]["pid_mdoc_cert"]
+    with open(certificate_path, "rb") as certificate:
         certificate_data = certificate.read()
+
+    certificate_summary = _certificate_log_summary(certificate_data)
+    cfgservice.app_logger.info(
+        "SD-JWT issuer certificate path=%s subject=%s issuer=%s san=%s sha256=%s",
+        certificate_path,
+        certificate_summary["subject"],
+        certificate_summary["issuer"],
+        ", ".join(certificate_summary["san"]) or "none",
+        certificate_summary["sha256"],
+    )
 
     certificate_base64 = base64.b64encode(certificate_data).decode("utf-8")
     x5c = {"x5c": []}
