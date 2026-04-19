@@ -22,4 +22,4 @@ ENV FLASK_APP=app
 
 EXPOSE 5000
 
-CMD ["flask", "run", "--host=0.0.0.0"]
+CMD ["sh", "support/run_container.sh"]
