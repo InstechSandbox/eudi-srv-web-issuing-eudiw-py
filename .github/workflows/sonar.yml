@@ -8,16 +8,26 @@ jobs:
   check_secret:
     name: Check secret presence
     runs-on: ubuntu-latest
+    outputs:
+      has_secret: ${{ steps.check.outputs.has_secret }}
     steps:
-    - run: if [[ -z "$SONAR_TOKEN" ]]; then exit 1; else echo "Secret exists. The workflow will be continued"; fi
-    env:
-       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    - id: check
+      run: |
+        if [[ -z "$SONAR_TOKEN" ]]; then
+          echo "SonarCloud skipped because SONAR_TOKEN is not configured."
+          echo "has_secret=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "Secret exists. The workflow will be continued"
+          echo "has_secret=true" >> "$GITHUB_OUTPUT"
+        fi
+      env:
+         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   
   P_WD_analysis:
     name: SAST - SonarCloud - Push/WD analysis
     needs: check_secret
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push'|| github.event_name == 'workflow_dispatch')
+    if: (github.event_name == 'push'|| github.event_name == 'workflow_dispatch') && needs.check_secret.outputs.has_secret == 'true'
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
@@ -55,7 +65,7 @@ jobs:
     name: SAST- SonarCloud - PR analysis
     needs: check_secret
     runs-on: ubuntu-latest
-    if: (github.event_name == 'pull_request_target')
+    if: (github.event_name == 'pull_request_target') && needs.check_secret.outputs.has_secret == 'true'
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
