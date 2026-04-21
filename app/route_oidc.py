@@ -676,10 +676,7 @@ def decrypt_jwe_credential_request(jwt_token):
         raise ValueError("Invalid JWE format - expected 5 parts")
 
     try:
-        with open(cfgservice.credential_request_priv_key, "r") as key_file:
-            pem_private_key = key_file.read()
-
-        private_key = jwk.JWK.from_pem(pem_private_key.encode("utf-8"))
+        private_key = cfgservice.load_credential_request_private_key()
 
         jwe_token = jwe.JWE()
         jwe_token.deserialize(jwt_token)

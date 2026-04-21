@@ -24,14 +24,24 @@ This config_service.py contains configuration data for the PID Issuer Web servic
 NOTE: You should only change it if you understand what you're doing.
 """
 
-import logging
-from concurrent_log_handler import ConcurrentTimedRotatingFileHandler
 import os
 import sys
+import json
+import logging
+from functools import lru_cache
+
+from concurrent_log_handler import ConcurrentTimedRotatingFileHandler
+from jwcrypto import jwk
 
 
 def _env_flag(name, default="false"):
     return os.getenv(name, default).strip().lower() not in {"0", "false", "no"}
+
+
+@lru_cache(maxsize=None)
+def _load_credential_request_private_key(path):
+    with open(path, "rb") as key_file:
+        return jwk.JWK.from_pem(key_file.read())
 
 
 class ConfService:
@@ -78,6 +88,19 @@ class ConfService:
     credential_request_priv_key = os.getenv(
         "CREDENTIAL_KEY", "/etc/eudiw/pid-issuer-dev/privKey/credential_request.pem"
     )
+
+    @classmethod
+    def load_credential_request_private_key(cls):
+        return _load_credential_request_private_key(cls.credential_request_priv_key)
+
+    @classmethod
+    def credential_request_public_jwk(cls):
+        public_jwk = json.loads(
+            cls.load_credential_request_private_key().export(private_key=False)
+        )
+        public_jwk["use"] = "enc"
+        public_jwk["alg"] = "ECDH-ES"
+        return public_jwk
 
     # ------------------------------------------------------------------------------------------------
     # OpenID endpoints

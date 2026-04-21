@@ -161,6 +161,42 @@ def _apply_metadata_overrides(
     if isinstance(jwk, dict):
         credential_request_encryption["jwks"] = {"keys": [jwk]}
 
+
+def _normalize_public_jwk(jwk_value: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        key: jwk_value.get(key)
+        for key in ("kty", "crv", "x", "y", "kid", "alg", "use")
+        if key in jwk_value
+    }
+
+
+def validate_credential_request_key_alignment() -> None:
+    credential_request_encryption = oidc_metadata.get("credential_request_encryption")
+    if not isinstance(credential_request_encryption, dict):
+        return
+
+    jwks = credential_request_encryption.get("jwks")
+    if not isinstance(jwks, dict):
+        return
+
+    keys = jwks.get("keys")
+    if not isinstance(keys, list) or not keys or not isinstance(keys[0], dict):
+        return
+
+    configured_public_jwk = _normalize_public_jwk(keys[0])
+    runtime_public_jwk = _normalize_public_jwk(cfgserv.credential_request_public_jwk())
+    if configured_public_jwk == runtime_public_jwk:
+        return
+
+    message = (
+        "Configured credential_request_encryption JWK does not match the "
+        "CREDENTIAL_KEY public key"
+    )
+    if os.getenv("ISSUER_METADATA_OVERRIDES_FILE") or os.getenv("METADATA_OVERRIDES_FILE"):
+        raise RuntimeError(message)
+
+    cfgserv.app_logger.warning(message)
+
 def setup_metadata():
     global oidc_metadata
     global oidc_metadata_clean
@@ -254,6 +290,7 @@ def setup_metadata():
     )
 
 setup_metadata()
+validate_credential_request_key_alignment()
 
 IS_TEST_ENV = (
     "pytest" in sys.modules

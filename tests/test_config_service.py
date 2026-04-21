@@ -81,3 +81,21 @@ def test_error_list_contains_known_codes():
     assert "-1" in errors
     assert errors["0"] == "No error."
     assert "101" in errors and "Missing mandatory" in errors["101"]
+
+
+def test_credential_request_public_jwk_uses_loaded_private_key(monkeypatch):
+    """Ensure the published credential-request JWK is derived from the loaded private key."""
+    import app.app_config.config_service as config_service
+
+    config_service._load_credential_request_private_key.cache_clear()
+
+    mock_key = pytest.importorskip("unittest.mock").Mock()
+    mock_key.export.return_value = '{"kty": "EC", "crv": "P-256", "x": "x", "y": "y", "kid": "kid"}'
+
+    monkeypatch.setattr(config_service, "_load_credential_request_private_key", lambda path: mock_key)
+
+    public_jwk = config_service.ConfService.credential_request_public_jwk()
+
+    assert public_jwk["kty"] == "EC"
+    assert public_jwk["alg"] == "ECDH-ES"
+    assert public_jwk["use"] == "enc"

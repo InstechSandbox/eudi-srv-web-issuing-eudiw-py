@@ -709,25 +709,13 @@ class TestGenerateCredentials:
 class TestDecryptJWE:
     """Test JWE decryption"""
 
-    @patch("builtins.open")
-    @patch("app.route_oidc.jwk.JWK")
     @patch("app.route_oidc.jwe.JWE")
-    def test_decrypt_jwe_success(
-        self, mock_jwe_class, mock_jwk_class, mock_open, mock_cfgservice
-    ):
+    def test_decrypt_jwe_success(self, mock_jwe_class, mock_cfgservice):
         """Test successful JWE decryption"""
         from app.route_oidc import decrypt_jwe_credential_request
 
-        # Mock file reading
-        mock_file = Mock()
-        mock_file.read.return_value = (
-            "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
-        )
-        mock_open.return_value.__enter__.return_value = mock_file
-
-        # Mock JWK
         mock_key = Mock()
-        mock_jwk_class.from_pem.return_value = mock_key
+        mock_cfgservice.load_credential_request_private_key.return_value = mock_key
 
         # Mock JWE
         mock_jwe = Mock()
