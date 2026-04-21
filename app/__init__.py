@@ -184,7 +184,19 @@ def validate_credential_request_key_alignment() -> None:
         return
 
     configured_public_jwk = _normalize_public_jwk(keys[0])
-    runtime_public_jwk = _normalize_public_jwk(cfgserv.credential_request_public_jwk())
+    try:
+        runtime_public_jwk = _normalize_public_jwk(cfgserv.credential_request_public_jwk())
+    except FileNotFoundError:
+        message = (
+            "Credential request private key is not available while validating "
+            "credential_request_encryption alignment"
+        )
+        if os.getenv("ISSUER_METADATA_OVERRIDES_FILE") or os.getenv("METADATA_OVERRIDES_FILE"):
+            raise RuntimeError(message)
+
+        cfgserv.app_logger.warning(message)
+        return
+
     if configured_public_jwk == runtime_public_jwk:
         return
 
