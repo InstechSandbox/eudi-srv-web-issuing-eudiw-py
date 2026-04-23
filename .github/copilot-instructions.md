@@ -5,7 +5,7 @@
 - This repo owns the issuer backend used by the current local reference flow.
 - Keep backend changes minimal unless verifier delivery or end-to-end interoperability requires them.
 - When issuer metadata, credential issuance behaviour, env contracts, or local interoperability rules change, update `project-docs` in the same task.
-- Default Git flow in this workspace is local `wip/<stream>` commits promoted directly with `git push origin HEAD:main`; do not publish remote `wip/<stream>` branches unless explicitly requested.
+- Default Git flow in this workspace is local `wip/<stream>` commits promoted into protected default branches through reviewed pull requests; do not publish remote `wip/<stream>` branches unless explicitly requested.
 
 ## Local Checks
 
